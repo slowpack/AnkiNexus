@@ -1,0 +1,15 @@
+{
+    "package": "card_linker",
+    "name": "Card Linker",
+    "author": "Card Linker Team",
+    "version": "1.0.0",
+    "description": "Link related cards together to solve card fragmentation. Supports English and Chinese languages.",
+    "homepage": "",
+    "tags": ["editor", "cards", "links", "multilingual"],
+    "min_point_version": 45,
+    "max_point_version": 0,
+    "branch_index": 0,
+    "mod": 0,
+    "conflicts": [],
+    "human_version": "1.0.0"
+}
