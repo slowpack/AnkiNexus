@@ -51,7 +51,33 @@ LANGUAGES = {
         "switch_failed": "Card switch failed",
         
         # Deck info
-        "deck_label": "Deck"
+        "deck_label": "Deck",
+
+        # Default note type
+        "default_note_type_name": "AnkiNexus - Knowledge Linker",
+        "front_field_name": "Front",
+        "back_field_name": "Back",
+        "card_template_name": "Card 1",
+        "front_template": "{{Front}}",
+        "back_template": "{{FrontSide}}\n\n<hr id=answer>\n\n{{Back}}",
+        "create_note_type_failed": "Failed to create default note type: {}",
+
+        # Template suggestions
+        "switch_template_suggestion": "Found existing '{}' note type with '{}' field!\n\nWould you like to switch to this note type for creating linked cards?",
+        "create_template_suggestion": "To use the Card Linker feature, you need a note type with '{}' field.\n\nWould you like me to create an 'AnkiNexus - Knowledge Linker' note type for you?\n\nThis will include:\n• Front and Back fields\n• LinkedCards field for storing links\n• Optimized templates for compound cards",
+        "template_switched": "Successfully switched to AnkiNexus note type! You can now create linked cards.",
+        "template_created_switched": "Successfully created and switched to AnkiNexus note type! You can now create linked cards.",
+        "switch_failed_error": "Failed to switch note type: {}",
+        "manual_switch_instructions": "Please manually switch to '{}' note type:\n\n1. Click the note type dropdown in the editor\n2. Select '{}'\n3. Then try creating links again",
+
+        # Suspended card handling
+        "unsuspend_card_question": "The target card is suspended. Would you like to unsuspend it and continue?",
+        "unbury_card_question": "The target card is buried. Would you like to unbury it and continue?",
+        "restore_card_question": "The target card is not available for review. Would you like to restore it and continue?",
+        "card_unsuspended": "Card has been unsuspended successfully!",
+        "card_unburied": "Card has been unburied successfully!",
+        "card_restored": "Card has been restored successfully!",
+        "unsuspend_failed": "Failed to restore card: {}"
     },
     
     "zh": {
@@ -100,7 +126,33 @@ LANGUAGES = {
         "switch_failed": "卡片切换失败",
         
         # Deck info
-        "deck_label": "牌组"
+        "deck_label": "牌组",
+
+        # Default note type
+        "default_note_type_name": "AnkiNexus - 知识链接器",
+        "front_field_name": "正面",
+        "back_field_name": "背面",
+        "card_template_name": "卡片 1",
+        "front_template": "{{正面}}",
+        "back_template": "{{FrontSide}}\n\n<hr id=answer>\n\n{{背面}}",
+        "create_note_type_failed": "创建默认笔记类型失败: {}",
+
+        # Template suggestions
+        "switch_template_suggestion": "发现已存在的 '{}' 笔记类型，包含 '{}' 字段！\n\n是否切换到此笔记类型来创建链接卡片？",
+        "create_template_suggestion": "要使用卡片链接功能，需要包含 '{}' 字段的笔记类型。\n\n是否让我为您创建一个 'AnkiNexus - 知识链接器' 笔记类型？\n\n它将包含：\n• 正面和背面字段\n• LinkedCards 字段用于存储链接\n• 为复合卡片优化的模板",
+        "template_switched": "成功切换到 AnkiNexus 笔记类型！现在可以创建链接卡片了。",
+        "template_created_switched": "成功创建并切换到 AnkiNexus 笔记类型！现在可以创建链接卡片了。",
+        "switch_failed_error": "切换笔记类型失败: {}",
+        "manual_switch_instructions": "请手动切换到 '{}' 笔记类型：\n\n1. 点击编辑器中的笔记类型下拉菜单\n2. 选择 '{}'\n3. 然后重新尝试创建链接",
+
+        # Suspended card handling
+        "unsuspend_card_question": "目标卡片已被暂停。是否要取消暂停并继续？",
+        "unbury_card_question": "目标卡片已被搁置。是否要取消搁置并继续？",
+        "restore_card_question": "目标卡片无法复习。是否要恢复该卡片并继续？",
+        "card_unsuspended": "卡片已成功取消暂停！",
+        "card_unburied": "卡片已成功取消搁置！",
+        "card_restored": "卡片已成功恢复！",
+        "unsuspend_failed": "恢复卡片失败: {}"
     }
 }
 
@@ -108,16 +160,47 @@ def get_language():
     """Get current language setting"""
     try:
         from aqt import mw
+
         # Check user preference first
-        config = mw.addonManager.getConfig(__name__)
-        if config and config.get("language"):
-            return config["language"]
-        
+        try:
+            config = mw.addonManager.getConfig(__name__)
+            if config and config.get("language") and config.get("language") != "auto":
+                return config["language"]
+        except:
+            pass
+
         # Fall back to Anki's language setting
-        lang = mw.pm.meta.get("defaultLang", "en")
-        if lang.startswith("zh") or lang in ["zh-CN", "zh-TW"]:
-            return "zh"
-        else:
+        try:
+            # Try multiple ways to get language setting
+            lang = None
+
+            # Method 1: Check profile meta
+            if hasattr(mw, 'pm') and mw.pm and hasattr(mw.pm, 'meta'):
+                lang = mw.pm.meta.get("defaultLang", None)
+
+            # Method 2: Check collection language
+            if not lang and hasattr(mw, 'col') and mw.col:
+                try:
+                    lang = mw.col.get_config("defaultLang", None)
+                except:
+                    pass
+
+            # Method 3: Check system locale
+            if not lang:
+                import locale
+                try:
+                    lang = locale.getdefaultlocale()[0]
+                except:
+                    pass
+
+            # Check if it's Chinese
+            if lang:
+                lang_lower = lang.lower()
+                if any(x in lang_lower for x in ["zh", "chinese", "china", "taiwan", "hong"]):
+                    return "zh"
+
+            return "en"
+        except:
             return "en"
     except:
         return "en"  # Default to English

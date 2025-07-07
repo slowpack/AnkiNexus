@@ -57,12 +57,116 @@ class CardLinker:
 
         self.show_link_dialog(editor)
     
+
+
+    def create_default_note_type(self):
+        """Create default note type with LinkedCards field"""
+        try:
+            # Create new model
+            model = mw.col.models.new(get_text("default_note_type_name"))
+
+            # Add fields
+            front_field = mw.col.models.newField(get_text("front_field_name"))
+            mw.col.models.addField(model, front_field)
+
+            back_field = mw.col.models.newField(get_text("back_field_name"))
+            mw.col.models.addField(model, back_field)
+
+            linked_cards_field = mw.col.models.newField(self.linked_cards_field)
+            mw.col.models.addField(model, linked_cards_field)
+
+            # Create card template
+            template = mw.col.models.newTemplate(get_text("card_template_name"))
+            template['qfmt'] = get_text("front_template")
+            template['afmt'] = get_text("back_template")
+
+            mw.col.models.addTemplate(model, template)
+
+            # Save the model
+            mw.col.models.add(model)
+            mw.col.models.save(model)
+
+            return model
+        except Exception as e:
+            showInfo(get_text("create_note_type_failed").format(str(e)))
+            return None
+
+    def add_linked_cards_field_to_model(self, model):
+        """Add LinkedCards field to existing model"""
+        try:
+            linked_cards_field = mw.col.models.newField(self.linked_cards_field)
+            mw.col.models.addField(model, linked_cards_field)
+            mw.col.models.save(model)
+        except Exception as e:
+            # Silently fail to avoid disrupting user experience
+            pass
+
     def check_field_exists(self, note):
-        """Check if LinkedCards field exists"""
+        """Check if LinkedCards field exists and offer solutions"""
         try:
             _ = note[self.linked_cards_field]
             return True
         except KeyError:
+            return self.handle_missing_field(note)
+
+    def handle_missing_field(self, note):
+        """Handle missing LinkedCards field with smart suggestions"""
+        # Check if AnkiNexus note type exists
+        note_type_name = get_text("default_note_type_name")
+        existing_models = mw.col.models.all()
+        ankiNexus_model = None
+
+        for model in existing_models:
+            if model['name'] == note_type_name:
+                field_names = [field['name'] for field in model['flds']]
+                if self.linked_cards_field in field_names:
+                    ankiNexus_model = model
+                    break
+
+        if ankiNexus_model:
+            # AnkiNexus template exists, suggest switching
+            return self.suggest_switch_template(ankiNexus_model)
+        else:
+            # No AnkiNexus template, suggest creating one
+            return self.suggest_create_template()
+
+    def suggest_switch_template(self, ankiNexus_model):
+        """Suggest switching to AnkiNexus template"""
+        from aqt.utils import askUser
+
+        message = get_text("switch_template_suggestion").format(
+            ankiNexus_model['name'],
+            self.linked_cards_field
+        )
+
+        if askUser(message):
+            # Show manual switch instructions instead of automatic switching
+            showInfo(get_text("manual_switch_instructions").format(ankiNexus_model['name'], ankiNexus_model['name']))
+            return False
+        return False
+
+    def suggest_create_template(self):
+        """Suggest creating AnkiNexus template"""
+        from aqt.utils import askUser
+
+        message = get_text("create_template_suggestion").format(self.linked_cards_field)
+
+        if askUser(message):
+            # Create AnkiNexus template
+            model = self.create_default_note_type()
+            if model:
+                # Switch to the new template
+                try:
+                    mw.col.conf['curModel'] = model['id']
+                    mw.col.save()
+                    showInfo(get_text("template_created_switched"))
+                    return True
+                except Exception as e:
+                    showInfo(get_text("switch_failed_error").format(str(e)))
+                    return False
+            return False
+        else:
+            # User declined, show manual instructions
             showInfo(get_text("field_missing").format(self.linked_cards_field, self.linked_cards_field))
             return False
     
@@ -496,8 +600,11 @@ def open_card_in_browser(card_id):
 
         # Check if target card can be reviewed
         if target_card.queue < 0:  # Suspended or buried cards
-            showInfo(get_text("card_suspended"))
-            return
+            if handle_suspended_card(target_card):
+                # Card was unsuspended, reload it
+                target_card = mw.col.getCard(card_id)
+            else:
+                return
 
         # Execute card switch
         success, error_msg = switch_to_target_card(current_card, target_card)
@@ -507,6 +614,60 @@ def open_card_in_browser(card_id):
 
     except Exception as e:
         showInfo(get_text("switch_failed"))
+
+def handle_suspended_card(card):
+    """Handle suspended or buried card"""
+    from aqt.utils import askUser
+
+    try:
+        if card.queue == -1:  # Suspended card
+            message = get_text("unsuspend_card_question")
+            if askUser(message):
+                # Unsuspend the card
+                mw.col.sched.unsuspendCards([card.id])
+                mw.col.save()
+                showInfo(get_text("card_unsuspended"))
+                return True
+            else:
+                return False
+        elif card.queue == -2:  # Buried card
+            message = get_text("unbury_card_question")
+            if askUser(message):
+                # Unbury the card
+                mw.col.sched.unburyCards()
+                mw.col.save()
+                showInfo(get_text("card_unburied"))
+                return True
+            else:
+                return False
+        elif card.queue == -3:  # Buried (sibling)
+            message = get_text("unbury_card_question")
+            if askUser(message):
+                # Unbury the card
+                mw.col.sched.unburyCards()
+                mw.col.save()
+                showInfo(get_text("card_unburied"))
+                return True
+            else:
+                return False
+        else:
+            # Other negative queue values - ask generically
+            message = get_text("restore_card_question")
+            if askUser(message):
+                # Try to restore the card by setting it to new state
+                card.queue = 0  # New card
+                card.type = 0   # New card type
+                mw.col.updateCard(card)
+                mw.col.save()
+                showInfo(get_text("card_restored"))
+                return True
+            else:
+                return False
+
+        return False
+    except Exception as e:
+        showInfo(get_text("unsuspend_failed").format(str(e)))
+        return False
 
 def get_current_time():
     """Get current timestamp - compatible with different Anki versions"""

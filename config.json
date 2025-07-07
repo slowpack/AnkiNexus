@@ -1,0 +1,8 @@
+{
+    "language": "auto",
+    "linked_cards_field": "LinkedCards",
+    "auto_create_template": true,
+    "show_review_status": true,
+    "enable_smart_switch": true,
+    "max_search_results": 30
+}

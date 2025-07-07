@@ -1,15 +1,15 @@
 {
-    "package": "card_linker",
-    "name": "Card Linker",
-    "author": "Card Linker Team",
-    "version": "1.0.0",
-    "description": "Link related cards together to solve card fragmentation. Supports English and Chinese languages.",
-    "homepage": "",
-    "tags": ["editor", "cards", "links", "multilingual"],
-    "min_point_version": 45,
+    "package": "ankiNexus",
+    "name": "AnkiNexus - Knowledge Linker",
+    "author": "AnkiNexus Team",
+    "version": "1.1.0",
+    "description": "A powerful Anki plugin that solves card fragmentation by creating compound cards and linking related knowledge points. Features smart template creation, intelligent review experience, and seamless bilingual support.",
+    "homepage": "https://github.com/your-username/AnkiNexus",
+    "tags": ["editor", "cards", "links", "multilingual", "compound-cards", "knowledge-network", "smart-review"],
+    "min_point_version": 50,
     "max_point_version": 0,
     "branch_index": 0,
     "mod": 0,
     "conflicts": [],
-    "human_version": "1.0.0"
+    "human_version": "1.1.0"
 }
