@@ -219,13 +219,53 @@ class CardLinker:
         """在编辑器中插入链接"""
         escaped_text = link_text.replace("'", "\\'").replace('"', '\\"')
         link_html = f'<span style="background-color: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; padding: 3px 8px; margin: 0 3px; color: #1976d2; font-weight: 500;" data-card-id="{card_id}">🔗 {escaped_text}</span>'
-        escaped_html = link_html.replace("'", "\\'")
-        
+
         try:
-            editor.web.eval(f"document.execCommand('insertHTML', false, '{escaped_html}');")
-        except:
-            link_mark = f" [🔗{link_text}] "
-            editor.web.eval(f"document.execCommand('insertText', false, '{link_mark}');")
+            # 直接使用JavaScript插入HTML，避免loadNote()覆盖问题
+            escaped_html = link_html.replace("'", "\\'").replace('"', '\\"')
+
+            # 在光标位置插入链接
+            js_code = f"""
+            try {{
+                var selection = window.getSelection();
+                var range = selection.getRangeAt(0);
+                var linkElement = document.createElement('span');
+                linkElement.innerHTML = '{escaped_html}';
+                range.insertNode(linkElement.firstChild);
+
+                // 移动光标到链接后面
+                range.setStartAfter(linkElement.firstChild);
+                range.setEndAfter(linkElement.firstChild);
+                selection.removeAllRanges();
+                selection.addRange(range);
+
+                // 触发输入事件以更新编辑器
+                document.execCommand('insertText', false, ' ');
+                document.execCommand('undo');
+            }} catch(e) {{
+                // 备用方法：直接插入HTML
+                document.execCommand('insertHTML', false, '{escaped_html} ');
+            }}
+            """
+
+            editor.web.eval(js_code)
+
+        except Exception as e:
+            # 最后的备用方法：使用纯文本
+            link_mark = f"[🔗{link_text}] "
+            try:
+                editor.web.eval(f"document.execCommand('insertText', false, '{link_mark}');")
+            except:
+                # 如果所有方法都失败，至少在字段开头添加链接
+                current_field = editor.currentField
+                if current_field is not None:
+                    current_content = editor.note.fields[current_field]
+                    if current_content.strip():
+                        new_content = link_mark + current_content
+                    else:
+                        new_content = link_mark
+                    editor.note.fields[current_field] = new_content
+                    editor.loadNote()
     
     def add_link_to_note(self, note, card_id, link_text):
         """Add link to note"""
@@ -234,6 +274,10 @@ class CardLinker:
 
             if not any(link['card_id'] == card_id for link in linked_cards):
                 card = mw.col.getCard(card_id)
+                if not card:
+                    showInfo(f"错误：找不到卡片 ID {card_id}")
+                    return False
+
                 linked_note = card.note()
 
                 link_info = {
@@ -244,9 +288,17 @@ class CardLinker:
                 }
 
                 linked_cards.append(link_info)
-                self.save_linked_cards(note, linked_cards)
+                success = self.save_linked_cards(note, linked_cards)
+                if not success:
+                    showInfo("保存链接信息失败")
+                    return False
+                return True
+            else:
+                showInfo("该卡片已经链接过了")
+                return True
         except Exception as e:
             showInfo(get_text("save_link_failed").format(str(e)))
+            return False
     
     def get_linked_cards(self, note):
         """获取链接卡片"""
@@ -259,14 +311,18 @@ class CardLinker:
     def save_linked_cards(self, note, linked_cards):
         """Save linked cards"""
         try:
-            note[self.linked_cards_field] = json.dumps(linked_cards, ensure_ascii=False)
+            json_data = json.dumps(linked_cards, ensure_ascii=False)
+            print(f"保存链接数据: {json_data}")
+            note[self.linked_cards_field] = json_data
             if note.id != 0:
                 mw.col.updateNote(note)
                 mw.col.save()
-                return True
-            return False
+                print(f"成功保存到字段 {self.linked_cards_field}")
+            return True
         except Exception as e:
-            showInfo(get_text("save_failed").format(str(e)))
+            error_msg = get_text("save_failed").format(str(e))
+            print(f"保存失败: {error_msg}")
+            showInfo(error_msg)
             return False
 
 class LinkDialog(QDialog):
@@ -276,6 +332,7 @@ class LinkDialog(QDialog):
         self.card_linker = card_linker
         self.current_note = editor.note
         self.selected_card_id = None
+        self.selected_card_title = None
         self.setup_ui()
     
     def setup_ui(self):
@@ -324,11 +381,19 @@ class LinkDialog(QDialog):
 
         # Buttons
         button_layout = QHBoxLayout()
-        ok_btn = QPushButton(get_text("create_link_button"))
-        ok_btn.clicked.connect(self.create_link)
+        add_btn = QPushButton("➕ " + get_text("create_link_button"))
+        add_btn.clicked.connect(self.create_link)
+        add_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 8px;")
+
+        done_btn = QPushButton("✅ 完成")
+        done_btn.clicked.connect(self.accept)
+        done_btn.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold; padding: 8px;")
+
         cancel_btn = QPushButton(get_text("cancel_button"))
         cancel_btn.clicked.connect(self.reject)
-        button_layout.addWidget(ok_btn)
+
+        button_layout.addWidget(add_btn)
+        button_layout.addWidget(done_btn)
         button_layout.addWidget(cancel_btn)
         layout.addLayout(button_layout)
 
@@ -357,6 +422,12 @@ class LinkDialog(QDialog):
         """选择现有卡片"""
         card_info = item.data(USER_ROLE)
         self.selected_card_id = card_info['id']
+        self.selected_card_title = card_info['question'][:50]  # 保存卡片标题用作默认链接名称
+
+        # 如果链接文本输入框为空，自动填充卡片标题
+        if not self.link_text_input.text().strip():
+            self.link_text_input.setText(self.selected_card_title)
+
         self.status_label.setText(f"已选择: {card_info['question'][:40]}...")
         self.status_label.setStyleSheet("background-color: #e8f5e8; padding: 8px; border-radius: 4px;")
     
@@ -372,6 +443,12 @@ class LinkDialog(QDialog):
         card_id = self.card_linker.create_new_card(self.current_note, front, back)
         if card_id:
             self.selected_card_id = card_id
+            self.selected_card_title = front[:50]  # 保存新创建卡片的标题
+
+            # 如果链接文本输入框为空，自动填充新卡片的标题
+            if not self.link_text_input.text().strip():
+                self.link_text_input.setText(self.selected_card_title)
+
             self.status_label.setText(f"Created: {front[:40]}...")
             self.status_label.setStyleSheet("background-color: #e3f2fd; padding: 8px; border-radius: 4px;")
             self.front_input.clear()
@@ -380,6 +457,12 @@ class LinkDialog(QDialog):
     def create_link(self):
         """Create link"""
         link_text = self.link_text_input.text().strip()
+
+        # 如果没有输入链接文本，但有选中的卡片，使用卡片标题作为默认名称
+        if not link_text and self.selected_card_title:
+            link_text = self.selected_card_title
+            self.link_text_input.setText(link_text)  # 更新输入框显示
+
         if not link_text:
             showInfo(get_text("enter_link_text"))
             return
@@ -388,13 +471,37 @@ class LinkDialog(QDialog):
             showInfo(get_text("select_or_create"))
             return
 
+        # 调试信息
+        print(f"创建链接: 卡片ID={self.selected_card_id}, 链接文本={link_text}")
+
+        # Save link information first
+        success = self.card_linker.add_link_to_note(self.current_note, self.selected_card_id, link_text)
+
+        if not success:
+            showInfo("链接创建失败，请检查卡片是否存在")
+            return
+
         # Insert link to editor
         self.card_linker.insert_link(self.editor, link_text, self.selected_card_id)
-        # Save link information
-        self.card_linker.add_link_to_note(self.current_note, self.selected_card_id, link_text)
 
-        showInfo(get_text("link_created"))
-        self.accept()
+        # Force refresh the editor to show updated LinkedCards field
+        try:
+            self.editor.loadNote()
+        except:
+            pass
+
+        # 显示成功消息但不关闭对话框
+        self.status_label.setText(f"✅ 链接已创建: {link_text}")
+        self.status_label.setStyleSheet("background-color: #e8f5e8; padding: 8px; border-radius: 4px; color: #2e7d32;")
+
+        # 清空输入框，准备添加下一个链接
+        self.link_text_input.clear()
+        self.selected_card_id = None
+        self.selected_card_title = None
+
+        # 清空搜索结果
+        self.search_results.clear()
+        self.search_input.clear()
 
 # 创建插件实例
 card_linker = CardLinker()
@@ -422,36 +529,60 @@ def add_linked_cards_to_review(html, card, context):
             .linked-cards-container {
                 border: 2px solid #2196f3;
                 border-radius: 8px;
-                padding: 15px;
-                margin: 15px 0;
+                padding: 10px;
+                margin: 10px 0;
                 background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+            }
+            .linked-cards-wrapper {
+                margin-top: 8px;
             }
             .linked-card-item {
                 display: block;
-                padding: 8px 12px;
-                margin: 6px 0;
+                padding: 6px 10px;
+                margin: 3px 0;
                 background-color: white;
                 border: 1px solid #e0e0e0;
                 border-radius: 6px;
                 color: #333;
                 cursor: pointer;
+                font-size: 12px;
+                transition: all 0.2s ease;
+                position: relative;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.1);
             }
             .linked-card-item:hover {
                 background-color: #f5f5f5;
                 border-color: #2196f3;
+                transform: translateX(3px);
+                box-shadow: 0 2px 6px rgba(0,0,0,0.15);
             }
             .knowledge-point-status {
                 float: right;
-                font-size: 16px;
+                font-size: 14px;
                 margin-left: 10px;
             }
             .status-reviewed { color: #4caf50; }
             .status-pending { color: #ff9800; }
+            .linked-cards-title {
+                font-weight: bold;
+                text-align: center;
+                margin-bottom: 8px;
+                color: #1976d2;
+                font-size: 14px;
+            }
+            .linked-cards-tip {
+                font-size: 11px;
+                color: #666;
+                text-align: center;
+                margin-top: 6px;
+                font-style: italic;
+            }
             </style>
             """
 
             links_html = '<div class="linked-cards-container">'
-            links_html += f'<div style="font-weight: bold; text-align: center; margin-bottom: 10px; color: #1976d2;">{get_text("related_knowledge")}</div>'
+            links_html += f'<div class="linked-cards-title">{get_text("related_knowledge")}</div>'
+            links_html += '<div class="linked-cards-wrapper">'
             
             for link in linked_cards:
                 try:
@@ -465,17 +596,25 @@ def add_linked_cards_to_review(html, card, context):
                         # Add click functionality
                         click_action = f"pycmd('linked_card:{link['card_id']}:{str(is_reviewed).lower()}')"
 
-                        links_html += f'''
-                        <div class="linked-card-item" onclick="{click_action}">
-                            📚 {link['title']} ({get_text("deck_label")}: {link['deck']})
-                            <span class="knowledge-point-status {status_class}">{status_icon}</span>
-                        </div>
-                        '''
-                except:
+                        # 安全处理特殊字符
+                        safe_title = link["title"].replace('"', '&quot;').replace("'", '&#39;')
+                        safe_deck = link["deck"].replace('"', '&quot;').replace("'", '&#39;')
+                        tooltip = f"{safe_title} ({get_text('deck_label')}: {safe_deck})"
+
+                        links_html += f'<div class="linked-card-item" onclick="{click_action}" title="{tooltip}">📚 {safe_title}<span class="knowledge-point-status {status_class}">{status_icon}</span></div>'
+                    else:
+                        # 卡片不存在，可能已被删除
+                        safe_title = link["title"].replace('"', '&quot;').replace("'", '&#39;')
+                        links_html += f'<div class="linked-card-item" style="opacity: 0.5; cursor: not-allowed;" title="{safe_title} (已删除)">📚 {safe_title} ❌</div>'
+                except Exception as e:
+                    # 记录错误但继续处理其他链接
+                    safe_title = link.get("title", "未知卡片").replace('"', '&quot;').replace("'", '&#39;')
+                    links_html += f'<div class="linked-card-item" style="opacity: 0.5; cursor: not-allowed;" title="{safe_title} (加载错误)">📚 {safe_title} ⚠️</div>'
                     continue
             
-            links_html += f'<div style="font-size: 12px; color: #666; text-align: center; margin-top: 8px; font-style: italic;">{get_text("review_status_tip")}</div>'
-            links_html += '</div>'
+            links_html += '</div>'  # 关闭 linked-cards-wrapper
+            links_html += f'<div class="linked-cards-tip">{get_text("review_status_tip")}</div>'
+            links_html += '</div>'  # 关闭 linked-cards-container
             html = css + html + links_html
     
     except:

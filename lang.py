@@ -13,7 +13,7 @@ LANGUAGES = {
         # Dialog
         "dialog_title": "Create Knowledge Link",
         "link_text_label": "Link Display Text:",
-        "link_text_placeholder": "e.g., Step 1 - Material Preparation",
+        "link_text_placeholder": "Leave empty to use card title as default",
         "search_existing_label": "Search Existing Cards:",
         "search_placeholder": "Enter keywords to search...",
         "create_new_label": "Or Create New Card:",
@@ -88,7 +88,7 @@ LANGUAGES = {
         # Dialog
         "dialog_title": "创建知识点链接",
         "link_text_label": "链接显示文本:",
-        "link_text_placeholder": "如: 步骤1-材料准备",
+        "link_text_placeholder": "留空将使用卡片标题作为默认名称",
         "search_existing_label": "搜索现有卡片:",
         "search_placeholder": "输入关键词搜索...",
         "create_new_label": "或创建新卡片:",
