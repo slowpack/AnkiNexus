@@ -11,7 +11,7 @@ from anki.notes import Note
 import json
 from .lang import get_text
 
-# PyQt6 兼容性修复
+# PyQt6 compatibility fix
 try:
     from PyQt6.QtCore import Qt
     from PyQt6.QtWidgets import QDialog
@@ -155,7 +155,7 @@ class CardLinker:
             # Create AnkiNexus template
             model = self.create_default_note_type()
             if model:
-                # 不自动切换，提示用户手动切换
+                # Don't auto-switch, prompt user to manually switch
                 showInfo(get_text("template_created_manual_switch").format(model['name'], model['name']))
                 return False
             return False
@@ -165,12 +165,12 @@ class CardLinker:
             return False
     
     def show_link_dialog(self, editor):
-        """显示链接对话框"""
+        """Show link dialog"""
         dialog = LinkDialog(editor, self)
         dialog.exec()
     
     def search_cards(self, query):
-        """搜索卡片"""
+        """Search cards"""
         try:
             card_ids = mw.col.findCards(query)
             cards = []
@@ -178,14 +178,14 @@ class CardLinker:
                 card = mw.col.getCard(card_id)
                 note = card.note()
 
-                # 清理标题用于显示
+                # Clean title for display
                 raw_question = note.fields[0] if note.fields else ""
                 clean_question = self.clean_card_title_for_search(raw_question)
 
                 cards.append({
                     'id': card_id,
                     'note_id': note.id,
-                    'question': clean_question[:80],  # 限制长度
+                    'question': clean_question[:80],  # Limit length
                     'deck': mw.col.decks.name(card.did)
                 })
             return cards
@@ -193,13 +193,13 @@ class CardLinker:
             return []
 
     def clean_card_title_for_search(self, title):
-        """为搜索结果清理卡片标题"""
+        """Clean card title for search results"""
         import re
 
-        # 去除HTML标签
+        # Remove HTML tags
         clean_title = re.sub(r'<[^>]+>', '', title)
 
-        # 去除多余的空白字符和换行
+        # Remove extra whitespace and newlines
         clean_title = re.sub(r'\s+', ' ', clean_title).strip()
 
         return clean_title
@@ -227,9 +227,9 @@ class CardLinker:
             return None
     
     def insert_link(self, editor, link_text, card_id):
-        """在编辑器中插入链接 - 仅存储JSON数据，不显示可视链接"""
-        # 不再在编辑器中插入可视链接，只保存JSON数据
-        # 链接信息已经通过 add_link_to_note 方法保存到 LinkedCards 字段
+        """Insert link in editor - only store JSON data, no visual link display"""
+        # No longer insert visual links in editor, only save JSON data
+        # Link information is already saved to LinkedCards field via add_link_to_note method
         pass
     
     def add_link_to_note(self, note, card_id, link_text):
@@ -240,7 +240,7 @@ class CardLinker:
             if not any(link['card_id'] == card_id for link in linked_cards):
                 card = mw.col.getCard(card_id)
                 if not card:
-                    showInfo(f"错误：找不到卡片 ID {card_id}")
+                    showInfo(get_text("error_card_not_found").format(card_id))
                     return False
 
                 linked_note = card.note()
@@ -255,18 +255,18 @@ class CardLinker:
                 linked_cards.append(link_info)
                 success = self.save_linked_cards(note, linked_cards)
                 if not success:
-                    showInfo("保存链接信息失败")
+                    showInfo(get_text("error_save_link_failed"))
                     return False
                 return True
             else:
-                showInfo("该卡片已经链接过了")
+                showInfo(get_text("error_card_already_linked"))
                 return True
         except Exception as e:
             showInfo(get_text("save_link_failed").format(str(e)))
             return False
     
     def get_linked_cards(self, note):
-        """获取链接卡片"""
+        """Get linked cards"""
         try:
             field_content = note[self.linked_cards_field] or "[]"
             return json.loads(field_content)
@@ -277,16 +277,16 @@ class CardLinker:
         """Save linked cards"""
         try:
             json_data = json.dumps(linked_cards, ensure_ascii=False)
-            print(f"保存链接数据: {json_data}")
+            print(get_text("debug_save_link_data").format(json_data))
             note[self.linked_cards_field] = json_data
             if note.id != 0:
                 mw.col.updateNote(note)
                 mw.col.save()
-                print(f"成功保存到字段 {self.linked_cards_field}")
+                print(get_text("debug_save_success").format(self.linked_cards_field))
             return True
         except Exception as e:
             error_msg = get_text("save_failed").format(str(e))
-            print(f"保存失败: {error_msg}")
+            print(get_text("debug_save_failed").format(error_msg))
             showInfo(error_msg)
             return False
 
@@ -296,7 +296,7 @@ class LinkDialog(QDialog):
         self.editor = editor
         self.card_linker = card_linker
         self.current_note = editor.note
-        self.selected_cards = []  # 改为列表存储多个选中的卡片
+        self.selected_cards = []  # Changed to list to store multiple selected cards
         self.setup_ui()
     
     def setup_ui(self):
@@ -306,11 +306,11 @@ class LinkDialog(QDialog):
 
         layout = QVBoxLayout()
 
-        # 上半部分：搜索和已选择卡片并排显示
+        # Top section: search and selected cards side by side
         top_layout = QHBoxLayout()
 
-        # 左侧：搜索区域
-        search_group = QGroupBox("🔍 搜索卡片")
+        # Left side: search area
+        search_group = QGroupBox(get_text("search_cards_group"))
         search_layout = QVBoxLayout()
 
         self.search_input = QLineEdit()
@@ -318,14 +318,14 @@ class LinkDialog(QDialog):
         self.search_input.textChanged.connect(self.search_cards)
         search_layout.addWidget(self.search_input)
 
-        # 搜索结果列表
+        # Search results list
         self.search_results = QListWidget()
         self.search_results.setMaximumHeight(200)
         self.search_results.itemDoubleClicked.connect(self.on_item_double_clicked)
         search_layout.addWidget(self.search_results)
 
-        # 添加选中卡片按钮
-        add_selected_btn = QPushButton("➕ 添加选中卡片")
+        # Add selected card button
+        add_selected_btn = QPushButton(get_text("add_selected_card"))
         add_selected_btn.clicked.connect(self.on_add_button_clicked)
         add_selected_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 6px;")
         search_layout.addWidget(add_selected_btn)
@@ -333,23 +333,23 @@ class LinkDialog(QDialog):
         search_group.setLayout(search_layout)
         top_layout.addWidget(search_group)
 
-        # 右侧：已选择卡片区域
-        selected_group = QGroupBox("📋 已选择的卡片")
+        # Right side: selected cards area
+        selected_group = QGroupBox(get_text("selected_cards_group"))
         selected_layout = QVBoxLayout()
 
-        # 已选择卡片列表
+        # Selected cards list
         self.selected_cards_list = QListWidget()
         self.selected_cards_list.setMaximumHeight(200)
         selected_layout.addWidget(self.selected_cards_list)
 
-        # 操作按钮行
+        # Operation buttons row
         selected_buttons_layout = QHBoxLayout()
 
-        remove_selected_btn = QPushButton("🗑️ 移除选中")
+        remove_selected_btn = QPushButton(get_text("remove_selected"))
         remove_selected_btn.clicked.connect(self.remove_selected_card)
         remove_selected_btn.setStyleSheet("background-color: #f44336; color: white; padding: 4px;")
 
-        clear_all_btn = QPushButton("🧹 清空全部")
+        clear_all_btn = QPushButton(get_text("clear_all"))
         clear_all_btn.clicked.connect(self.clear_all_selections)
         clear_all_btn.setStyleSheet("background-color: #ff9800; color: white; padding: 4px;")
 
@@ -363,17 +363,17 @@ class LinkDialog(QDialog):
 
         layout.addLayout(top_layout)
 
-        # 创建新卡片区域
-        create_group = QGroupBox("➕ 创建新卡片")
+        # Create new card area
+        create_group = QGroupBox(get_text("create_new_card_group"))
         create_layout = QHBoxLayout()
 
-        create_info_label = QLabel("点击按钮快速创建新卡片，创建成功后会自动添加为链接")
+        create_info_label = QLabel(get_text("create_new_card_info"))
         create_info_label.setStyleSheet("color: #666; font-size: 12px;")
         create_layout.addWidget(create_info_label)
 
         create_layout.addStretch()
 
-        create_btn = QPushButton("🆕 " + get_text("create_new_button"))
+        create_btn = QPushButton(get_text("create_new_card_btn"))
         create_btn.clicked.connect(self.open_add_cards_dialog)
         create_btn.setStyleSheet("background-color: #2196F3; color: white; padding: 8px; font-weight: bold;")
         create_layout.addWidget(create_btn)
@@ -381,16 +381,16 @@ class LinkDialog(QDialog):
         create_group.setLayout(create_layout)
         layout.addWidget(create_group)
 
-        # 状态显示
-        self.status_label = QLabel("双击或点击添加按钮来选择卡片，选择后会立即创建链接")
+        # Status display
+        self.status_label = QLabel(get_text("status_select_cards"))
         self.status_label.setStyleSheet("background-color: #e3f2fd; padding: 8px; border-radius: 4px; color: #1976d2;")
         layout.addWidget(self.status_label)
 
-        # 只保留关闭按钮
+        # Only keep close button
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        close_btn = QPushButton("✅ 关闭")
+        close_btn = QPushButton(get_text("close_dialog"))
         close_btn.clicked.connect(self.accept)
         close_btn.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold; padding: 8px;")
         button_layout.addWidget(close_btn)
@@ -399,17 +399,17 @@ class LinkDialog(QDialog):
 
         self.setLayout(layout)
 
-        # 加载已有的链接
+        # Load existing links
         self.load_existing_links()
 
     def load_existing_links(self):
-        """加载已有的链接到显示列表"""
+        """Load existing links to display list"""
         try:
             linked_cards = self.card_linker.get_linked_cards(self.current_note)
 
             for link in linked_cards:
                 try:
-                    # 验证卡片是否还存在
+                    # Verify if card still exists
                     card = mw.col.getCard(link['card_id'])
                     if card:
                         selected_card = {
@@ -421,17 +421,17 @@ class LinkDialog(QDialog):
                         }
                         self.selected_cards.append(selected_card)
                 except:
-                    # 卡片不存在，跳过
+                    # Card does not exist, skip
                     continue
 
             self.update_selected_cards_display()
             self.update_status()
         except:
-            # 如果加载失败，继续正常流程
+            # If loading fails, continue normal flow
             pass
 
     def search_cards(self):
-        """搜索卡片"""
+        """Search cards"""
         query = self.search_input.text().strip()
         if not query:
             self.search_results.clear()
@@ -444,7 +444,7 @@ class LinkDialog(QDialog):
             if card_info['note_id'] == self.current_note.id:
                 continue
 
-            # 检查是否已经选择过这张卡片
+            # Check if this card has already been selected
             already_selected = any(selected['id'] == card_info['id'] for selected in self.selected_cards)
 
             item_text = f"{card_info['question']} ({get_text('deck_label')}: {card_info['deck']})"
@@ -454,21 +454,21 @@ class LinkDialog(QDialog):
             item = QListWidgetItem(item_text)
             item.setData(USER_ROLE, card_info)
 
-            # 如果已选择，设置不同的背景色
+            # If already selected, set different background color
             if already_selected:
                 item.setBackground(QColor(200, 255, 200))
 
             self.search_results.addItem(item)
 
     def on_item_double_clicked(self, item):
-        """处理双击事件"""
+        """Handle double-click event"""
         self.add_card_to_selection(item)
 
     def on_add_button_clicked(self):
-        """处理添加按钮点击事件"""
+        """Handle add button click event"""
         current_item = self.search_results.currentItem()
         if not current_item:
-            showInfo("请先选择一张卡片")
+            showInfo(get_text("error_select_card_first"))
             return
         self.add_card_to_selection(current_item)
 
@@ -481,9 +481,9 @@ class LinkDialog(QDialog):
         if not card_info:
             return
 
-        # 检查是否已经链接过
+        # Check if already linked
         if any(selected['id'] == card_info['id'] for selected in self.selected_cards):
-            showInfo("该卡片已经添加过了")
+            showInfo(get_text("error_card_already_added"))
             return
 
         # 处理HTML格式和特殊字符，清理标题
@@ -507,23 +507,23 @@ class LinkDialog(QDialog):
             self.selected_cards.append(selected_card)
             self.update_selected_cards_display()
 
-            # 刷新编辑器
+            # Refresh editor
             try:
                 self.editor.loadNote()
             except:
                 pass
 
-            # 更新状态
-            self.status_label.setText(f"✅ 已添加链接: {clean_title[:30]}...")
+            # Update status
+            self.status_label.setText(get_text("status_link_added").format(clean_title[:30]))
             self.status_label.setStyleSheet("background-color: #e8f5e8; padding: 8px; border-radius: 4px; color: #2e7d32;")
 
-            # 刷新搜索结果显示
+            # Refresh search results display
             self.search_cards()
         else:
-            showInfo("链接创建失败，请检查卡片是否存在")
+            showInfo(get_text("error_link_creation_failed"))
 
     def update_selected_cards_display(self):
-        """更新已选择卡片的显示"""
+        """Update selected cards display"""
         self.selected_cards_list.clear()
 
         for i, card in enumerate(self.selected_cards):
@@ -533,20 +533,20 @@ class LinkDialog(QDialog):
             self.selected_cards_list.addItem(item)
 
     def update_status(self):
-        """更新状态显示"""
+        """Update status display"""
         count = len(self.selected_cards)
         if count == 0:
-            self.status_label.setText("双击或点击添加按钮来选择卡片，选择后会立即创建链接")
+            self.status_label.setText(get_text("status_select_cards"))
             self.status_label.setStyleSheet("background-color: #e3f2fd; padding: 8px; border-radius: 4px; color: #1976d2;")
         else:
-            self.status_label.setText(f"已创建 {count} 个链接")
+            self.status_label.setText(get_text("status_links_created").format(count))
             self.status_label.setStyleSheet("background-color: #e8f5e8; padding: 8px; border-radius: 4px; color: #2e7d32;")
 
     def remove_selected_card(self):
-        """移除选中的卡片并删除链接"""
+        """Remove selected card and delete link"""
         current_item = self.selected_cards_list.currentItem()
         if not current_item:
-            showInfo("请先选择要移除的卡片")
+            showInfo(get_text("error_select_card_to_remove"))
             return
 
         card_info = current_item.data(USER_ROLE)
@@ -570,21 +570,21 @@ class LinkDialog(QDialog):
                 except:
                     pass
 
-                # 刷新搜索结果显示
+                # Refresh search results display
                 self.search_cards()
 
-                self.status_label.setText(f"✅ 已移除链接: {card_info['display_text']}")
+                self.status_label.setText(get_text("status_link_removed").format(card_info['display_text']))
                 self.status_label.setStyleSheet("background-color: #fff3cd; padding: 8px; border-radius: 4px; color: #856404;")
             else:
-                showInfo("移除链接失败")
+                showInfo(get_text("error_remove_link_failed"))
 
     def clear_all_selections(self):
-        """清空所有链接"""
+        """Clear all links"""
         if not self.selected_cards:
             return
 
         from aqt.utils import askUser
-        if askUser("确定要删除所有已创建的链接吗？"):
+        if askUser(get_text("confirm_clear_all_links")):
             # 清空LinkedCards字段
             success = self.card_linker.save_linked_cards(self.current_note, [])
 
@@ -593,41 +593,41 @@ class LinkDialog(QDialog):
                 self.update_selected_cards_display()
                 self.update_status()
 
-                # 刷新编辑器
+                # Refresh editor
                 try:
                     self.editor.loadNote()
                 except:
                     pass
 
-                # 刷新搜索结果显示
+                # Refresh search results display
                 self.search_cards()
 
-                self.status_label.setText("✅ 已清空所有链接")
+                self.status_label.setText(get_text("status_all_links_cleared"))
                 self.status_label.setStyleSheet("background-color: #fff3cd; padding: 8px; border-radius: 4px; color: #856404;")
             else:
-                showInfo("清空链接失败")
+                showInfo(get_text("error_clear_links_failed"))
 
     def clean_card_title(self, title):
-        """清理卡片标题，去除HTML标签和特殊字符"""
+        """Clean card title, remove HTML tags and special characters"""
         import re
 
-        # 去除HTML标签
+        # Remove HTML tags
         clean_title = re.sub(r'<[^>]+>', '', title)
 
-        # 去除多余的空白字符和换行
+        # Remove extra whitespace and newlines
         clean_title = re.sub(r'\s+', ' ', clean_title).strip()
 
-        # 去除特殊字符，保留基本的文字、数字、标点
+        # Remove special characters, keep basic text, numbers, punctuation
         clean_title = re.sub(r'[^\w\s\u4e00-\u9fff.,!?;:()\-\[\]{}"]', '', clean_title)
 
         return clean_title
     
     def open_add_cards_dialog(self):
-        """打开简单的添加卡片对话框"""
+        """Open simple add card dialog"""
         self.create_simple_add_card_dialog()
 
     def create_simple_add_card_dialog(self):
-        """创建简单的添加卡片对话框（备选方案）"""
+        """Create simple add card dialog (alternative solution)"""
         dialog = SimpleAddCardDialog(self)
         if dialog.exec() == DIALOG_ACCEPTED:
             # 获取创建的卡片信息
@@ -635,7 +635,7 @@ class LinkDialog(QDialog):
                 self.auto_add_created_card(dialog.created_card_id, dialog.created_card_title)
 
     def auto_add_created_card(self, card_id, card_title):
-        """自动添加刚创建的卡片为链接"""
+        """Automatically add newly created card as link"""
         try:
             # 清理标题
             clean_title = self.clean_card_title(card_title)
@@ -661,23 +661,23 @@ class LinkDialog(QDialog):
                 self.selected_cards.append(selected_card)
                 self.update_selected_cards_display()
 
-                # 刷新编辑器
+                # Refresh editor
                 try:
                     self.editor.loadNote()
                 except:
                     pass
 
-                # 更新状态
-                self.status_label.setText(f"✅ 新卡片已创建并添加链接: {clean_title[:30]}...")
+                # Update status
+                self.status_label.setText(get_text("success_new_card_linked").format(clean_title[:30]))
                 self.status_label.setStyleSheet("background-color: #e8f5e8; padding: 8px; border-radius: 4px; color: #2e7d32;")
             else:
-                showInfo("新卡片创建成功，但链接创建失败")
+                showInfo(get_text("error_new_card_link_failed"))
         except Exception as e:
-            showInfo(f"添加链接失败: {str(e)}")
+            showInfo(get_text("error_add_link_failed").format(str(e)))
 
 
 class SimpleAddCardDialog(QDialog):
-    """简单的添加卡片对话框"""
+    """Simple add card dialog"""
     def __init__(self, parent):
         super().__init__(parent)
         self.parent_dialog = parent
@@ -686,32 +686,32 @@ class SimpleAddCardDialog(QDialog):
         self.setup_ui()
 
     def setup_ui(self):
-        """设置UI"""
-        self.setWindowTitle("创建新卡片")
+        """Setup UI"""
+        self.setWindowTitle(get_text("simple_add_card_title"))
         self.setMinimumSize(400, 200)
 
         layout = QVBoxLayout()
 
-        # 正面内容
-        layout.addWidget(QLabel("正面内容:"))
+        # Front content
+        layout.addWidget(QLabel(get_text("simple_add_card_front")))
         self.front_input = QLineEdit()
-        self.front_input.setPlaceholderText("输入卡片正面内容...")
+        self.front_input.setPlaceholderText(get_text("simple_add_card_front_placeholder"))
         layout.addWidget(self.front_input)
 
-        # 背面内容
-        layout.addWidget(QLabel("背面内容:"))
+        # Back content
+        layout.addWidget(QLabel(get_text("simple_add_card_back")))
         self.back_input = QLineEdit()
-        self.back_input.setPlaceholderText("输入卡片背面内容...")
+        self.back_input.setPlaceholderText(get_text("simple_add_card_back_placeholder"))
         layout.addWidget(self.back_input)
 
-        # 按钮
+        # Buttons
         button_layout = QHBoxLayout()
 
-        create_btn = QPushButton("创建卡片")
+        create_btn = QPushButton(get_text("simple_add_card_create"))
         create_btn.clicked.connect(self.create_card)
         create_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px; font-weight: bold;")
 
-        cancel_btn = QPushButton("取消")
+        cancel_btn = QPushButton(get_text("cancel_button"))
         cancel_btn.clicked.connect(self.reject)
 
         button_layout.addWidget(create_btn)
@@ -720,16 +720,16 @@ class SimpleAddCardDialog(QDialog):
         layout.addLayout(button_layout)
         self.setLayout(layout)
 
-        # 设置焦点
+        # Set focus
         self.front_input.setFocus()
 
     def create_card(self):
-        """创建卡片"""
+        """Create card"""
         front = self.front_input.text().strip()
         back = self.back_input.text().strip()
 
         if not front or not back:
-            showInfo("请填写正面和背面内容")
+            showInfo(get_text("error_fill_front_back"))
             return
 
         try:
@@ -746,7 +746,7 @@ class SimpleAddCardDialog(QDialog):
             if len(new_note.fields) > 1:
                 new_note.fields[1] = back
 
-            # 设置牌组（使用当前卡片的牌组或默认牌组）
+            # Set deck (use current card's deck or default deck)
             try:
                 if mw.reviewer and mw.reviewer.card:
                     deck_id = mw.reviewer.card.did
@@ -754,7 +754,7 @@ class SimpleAddCardDialog(QDialog):
                     deck_id = mw.col.conf['curDeck']
                 new_note.model()['did'] = deck_id
             except:
-                # 使用默认牌组
+                # Use default deck
                 pass
 
             # 添加笔记到集合
@@ -767,13 +767,13 @@ class SimpleAddCardDialog(QDialog):
                 self.created_card_id = new_cards[0].id
                 self.created_card_title = front
 
-                showInfo(f"卡片创建成功: {front[:30]}...")
+                showInfo(get_text("success_card_created").format(front[:30]))
                 self.accept()
             else:
-                showInfo("卡片创建失败：未生成卡片")
+                showInfo(get_text("error_card_creation_failed"))
 
         except Exception as e:
-            showInfo(f"创建卡片失败: {str(e)}")
+            showInfo(get_text("error_create_card_failed").format(str(e)))
             print(f"Create card error: {e}")
 
 
@@ -786,7 +786,7 @@ def setup_editor_buttons(buttons, editor):
 
 gui_hooks.editor_did_init_buttons.append(setup_editor_buttons)
 
-# 复习时显示关联卡片 - 简化版本
+# Display related cards during review - simplified version
 def add_linked_cards_to_review(html, card, context):
     """Display linked cards during review - only on answer side, simplified interaction"""
     # Only show related knowledge points when displaying answer
@@ -862,7 +862,7 @@ def add_linked_cards_to_review(html, card, context):
                 try:
                     linked_card = mw.col.getCard(link['card_id'])
                     if linked_card:
-                        # 检查今日是否已复习
+                        # Check if reviewed today
                         is_reviewed = check_card_reviewed_today(linked_card)
                         status_icon = "✅" if is_reviewed else "⏳"
                         status_class = "status-reviewed" if is_reviewed else "status-pending"
@@ -870,20 +870,22 @@ def add_linked_cards_to_review(html, card, context):
                         # Add click functionality
                         click_action = f"pycmd('linked_card:{link['card_id']}:{str(is_reviewed).lower()}')"
 
-                        # 安全处理特殊字符
+                        # Safely handle special characters
                         safe_title = link["title"].replace('"', '&quot;').replace("'", '&#39;')
                         safe_deck = link["deck"].replace('"', '&quot;').replace("'", '&#39;')
                         tooltip = f"{safe_title} ({get_text('deck_label')}: {safe_deck})"
 
                         links_html += f'<div class="linked-card-item" onclick="{click_action}" title="{tooltip}">📚 {safe_title}<span class="knowledge-point-status {status_class}">{status_icon}</span></div>'
                     else:
-                        # 卡片不存在，可能已被删除
+                        # Card does not exist, may have been deleted
                         safe_title = link["title"].replace('"', '&quot;').replace("'", '&#39;')
-                        links_html += f'<div class="linked-card-item" style="opacity: 0.5; cursor: not-allowed;" title="{safe_title} (已删除)">📚 {safe_title} ❌</div>'
+                        deleted_text = get_text('card_status_deleted')
+                        links_html += f'<div class="linked-card-item" style="opacity: 0.5; cursor: not-allowed;" title="{safe_title} ({deleted_text})">📚 {safe_title} ❌</div>'
                 except Exception as e:
-                    # 记录错误但继续处理其他链接
-                    safe_title = link.get("title", "未知卡片").replace('"', '&quot;').replace("'", '&#39;')
-                    links_html += f'<div class="linked-card-item" style="opacity: 0.5; cursor: not-allowed;" title="{safe_title} (加载错误)">📚 {safe_title} ⚠️</div>'
+                    # Log error but continue processing other links
+                    safe_title = link.get("title", get_text("card_status_unknown")).replace('"', '&quot;').replace("'", '&#39;')
+                    error_text = get_text('card_status_load_error')
+                    links_html += f'<div class="linked-card-item" style="opacity: 0.5; cursor: not-allowed;" title="{safe_title} ({error_text})">📚 {safe_title} ⚠️</div>'
                     continue
             
             links_html += '</div>'  # 关闭 linked-cards-wrapper
@@ -951,18 +953,18 @@ def handle_linked_card_click(cmd):
 
 
 def show_card_preview(card_id):
-    """显示卡片预览"""
+    """Show card preview"""
     try:
         card = mw.col.getCard(card_id)
         if not card:
             showInfo(get_text("card_not_found"))
             return
 
-        # 使用浏览器自动预览
+        # Use browser auto preview
         from aqt.browser import Browser
         from aqt.qt import QTimer
 
-        # 创建浏览器并搜索目标卡片
+        # Create browser and search target card
         browser = Browser(mw)
         browser.form.searchEdit.lineEdit().setText(f"cid:{card_id}")
         browser.onSearchActivated()
@@ -970,7 +972,7 @@ def show_card_preview(card_id):
 
         def auto_preview():
             try:
-                # 检查是否找到了卡片并自动触发预览
+                # Check if card is found and auto trigger preview
                 if hasattr(browser, 'table') and browser.table.len_selection() > 0:
                     if hasattr(browser.form, 'actionPreview'):
                         browser.form.actionPreview.trigger()
@@ -985,7 +987,7 @@ def show_card_preview(card_id):
             except:
                 showInfo(get_text("manual_preview"))
 
-        # 延迟1秒执行，确保搜索完成
+        # Delay 1 second execution to ensure search completion
         QTimer.singleShot(1000, auto_preview)
 
     except Exception as e:

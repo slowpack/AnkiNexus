@@ -1,34 +1,34 @@
 // Card Linker Plugin JavaScript
 
-// 显示链接卡片的函数
+// Function to display linked cards
 function showLinkedCards(linkedCards) {
     if (!linkedCards || linkedCards.length === 0) {
         return '';
     }
-    
+
     let html = '<div class="linked-cards-container">';
-    html += '<div class="linked-cards-title">相关卡片:</div>';
-    
+    html += '<div class="linked-cards-title">Related Cards:</div>';
+
     for (let card of linkedCards) {
         html += `<a href="#" class="linked-card-item" onclick="openLinkedCard(${card.card_id})">`;
         html += `${card.title} (${card.deck})`;
         html += '</a>';
     }
-    
+
     html += '</div>';
     return html;
 }
 
-// 打开链接的卡片
+// Open linked card
 function openLinkedCard(cardId) {
-    // 通过 Python 后端打开卡片
+    // Open card through Python backend
     pycmd(`card_linker:open_card:${cardId}`);
 }
 
-// 在卡片显示时添加链接信息
+// Add link information when card is displayed
 function addLinkedCardsToCard() {
-    // 这个函数会在卡片显示时被调用
-    // 从卡片的 LinkedCards 字段获取链接信息并显示
+    // This function will be called when card is displayed
+    // Get link information from card's LinkedCards field and display
     const linkedCardsField = document.querySelector('[data-field-name="LinkedCards"]');
     if (linkedCardsField && linkedCardsField.textContent) {
         try {
@@ -44,7 +44,7 @@ function addLinkedCardsToCard() {
     }
 }
 
-// 页面加载完成后执行
+// Execute after page loading is complete
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', addLinkedCardsToCard);
 } else {

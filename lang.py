@@ -78,7 +78,59 @@ LANGUAGES = {
         "card_unsuspended": "Card has been unsuspended successfully!",
         "card_unburied": "Card has been unburied successfully!",
         "card_restored": "Card has been restored successfully!",
-        "unsuspend_failed": "Failed to restore card: {}"
+        "unsuspend_failed": "Failed to restore card: {}",
+
+        # UI text
+        "search_cards_group": "🔍 Search Cards",
+        "selected_cards_group": "📋 Selected Cards",
+        "create_new_card_group": "➕ Create New Card",
+        "add_selected_card": "➕ Add Selected Card",
+        "remove_selected": "🗑️ Remove Selected",
+        "clear_all": "🧹 Clear All",
+        "create_new_card_info": "Click button to quickly create new card, it will be automatically added as link after creation",
+        "create_new_card_btn": "🆕 Create New Card",
+        "close_dialog": "✅ Close",
+        "status_select_cards": "Double-click or click add button to select cards, links will be created immediately after selection",
+        "status_links_created": "{} links created",
+        "status_link_added": "✅ Link added: {}...",
+        "status_link_removed": "✅ Link removed: {}",
+        "status_all_links_cleared": "✅ All links cleared",
+
+        # Error messages
+        "error_card_not_found": "Error: Card ID {} not found",
+        "error_save_link_failed": "Failed to save link information",
+        "error_card_already_linked": "This card is already linked",
+        "error_card_already_added": "This card has already been added",
+        "error_select_card_first": "Please select a card first",
+        "error_link_creation_failed": "Link creation failed, please check if card exists",
+        "error_select_card_to_remove": "Please select a card to remove first",
+        "error_remove_link_failed": "Failed to remove link",
+        "error_clear_links_failed": "Failed to clear links",
+        "error_add_link_failed": "Failed to add link: {}",
+        "error_create_card_failed": "Failed to create card: {}",
+        "error_fill_front_back": "Please fill in front and back content",
+        "error_card_creation_failed": "Card creation failed: No card generated",
+        "error_new_card_link_failed": "New card created successfully, but link creation failed",
+
+        # Confirmation messages
+        "confirm_clear_all_links": "Are you sure you want to delete all created links?",
+
+        # Success messages
+        "success_card_created": "Card created successfully: {}...",
+        "success_new_card_linked": "✅ New card created and linked: {}...",
+
+        # Simple add card dialog
+        "simple_add_card_title": "Create New Card",
+        "simple_add_card_front": "Front Content:",
+        "simple_add_card_back": "Back Content:",
+        "simple_add_card_front_placeholder": "Enter front content...",
+        "simple_add_card_back_placeholder": "Enter back content...",
+        "simple_add_card_create": "Create Card",
+
+        # Card status in review
+        "card_status_deleted": "Deleted",
+        "card_status_load_error": "Load Error",
+        "card_status_unknown": "Unknown Card"
     },
     
     "zh": {
@@ -154,7 +206,84 @@ LANGUAGES = {
         "card_unsuspended": "卡片已成功取消暂停！",
         "card_unburied": "卡片已成功取消搁置！",
         "card_restored": "卡片已成功恢复！",
-        "unsuspend_failed": "恢复卡片失败: {}"
+        "unsuspend_failed": "恢复卡片失败: {}",
+
+        # UI text
+        "search_cards_group": "🔍 搜索卡片",
+        "selected_cards_group": "📋 已选择的卡片",
+        "create_new_card_group": "➕ 创建新卡片",
+        "add_selected_card": "➕ 添加选中卡片",
+        "remove_selected": "🗑️ 移除选中",
+        "clear_all": "🧹 清空全部",
+        "create_new_card_info": "点击按钮快速创建新卡片，创建成功后会自动添加为链接",
+        "create_new_card_btn": "🆕 创建新卡片",
+        "close_dialog": "✅ 关闭",
+        "status_select_cards": "双击或点击添加按钮来选择卡片，选择后会立即创建链接",
+        "status_links_created": "已创建 {} 个链接",
+        "status_link_added": "✅ 已添加链接: {}...",
+        "status_link_removed": "✅ 已移除链接: {}",
+        "status_all_links_cleared": "✅ 已清空所有链接",
+
+        # Error messages
+        "error_card_not_found": "错误：找不到卡片 ID {}",
+        "error_save_link_failed": "保存链接信息失败",
+        "error_card_already_linked": "该卡片已经链接过了",
+        "error_card_already_added": "该卡片已经添加过了",
+        "error_select_card_first": "请先选择一张卡片",
+        "error_link_creation_failed": "链接创建失败，请检查卡片是否存在",
+        "error_select_card_to_remove": "请先选择要移除的卡片",
+        "error_remove_link_failed": "移除链接失败",
+        "error_clear_links_failed": "清空链接失败",
+        "error_add_link_failed": "添加链接失败: {}",
+        "error_create_card_failed": "创建卡片失败: {}",
+        "error_fill_front_back": "请填写正面和背面内容",
+        "error_card_creation_failed": "卡片创建失败：未生成卡片",
+        "error_new_card_link_failed": "新卡片创建成功，但链接创建失败",
+
+        # Confirmation messages
+        "confirm_clear_all_links": "确定要删除所有已创建的链接吗？",
+
+        # Success messages
+        "success_card_created": "卡片创建成功: {}...",
+        "success_new_card_linked": "✅ 新卡片已创建并添加链接: {}...",
+
+        # Simple add card dialog
+        "simple_add_card_title": "创建新卡片",
+        "simple_add_card_front": "正面内容:",
+        "simple_add_card_back": "背面内容:",
+        "simple_add_card_front_placeholder": "输入卡片正面内容...",
+        "simple_add_card_back_placeholder": "输入卡片背面内容...",
+        "simple_add_card_create": "创建卡片",
+
+        # Comments and debug messages
+        "debug_save_link_data": "保存链接数据: {}",
+        "debug_save_success": "成功保存到字段 {}",
+        "debug_save_failed": "保存失败: {}",
+        "comment_load_existing_links": "加载已有的链接到显示列表",
+        "comment_card_not_exist": "卡片不存在，跳过",
+        "comment_load_failed": "如果加载失败，继续正常流程",
+        "comment_check_already_selected": "检查是否已经选择过这张卡片",
+        "comment_set_selected_background": "如果已选择，设置不同的背景色",
+        "comment_handle_double_click": "处理双击事件",
+        "comment_check_already_linked": "检查是否已经链接过",
+        "comment_refresh_editor": "刷新编辑器",
+        "comment_update_status": "更新状态",
+        "comment_refresh_search_results": "刷新搜索结果显示",
+        "comment_set_deck": "设置牌组（使用当前卡片的牌组或默认牌组）",
+        "comment_use_default_deck": "使用默认牌组",
+        "comment_set_focus": "设置焦点",
+        "comment_card_deleted": "卡片不存在，可能已被删除",
+        "comment_card_load_error": "记录错误但继续处理其他链接",
+        "comment_check_reviewed_today": "检查今日是否已复习",
+        "comment_safe_handle_chars": "安全处理特殊字符",
+        "comment_auto_browser_preview": "使用浏览器自动预览",
+        "comment_check_card_found": "检查是否找到了卡片并自动触发预览",
+        "comment_delay_execution": "延迟1秒执行，确保搜索完成",
+
+        # Card status in review
+        "card_status_deleted": "已删除",
+        "card_status_load_error": "加载错误",
+        "card_status_unknown": "未知卡片"
     }
 }
 
