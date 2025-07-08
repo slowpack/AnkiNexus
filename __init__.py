@@ -216,56 +216,10 @@ class CardLinker:
             return None
     
     def insert_link(self, editor, link_text, card_id):
-        """在编辑器中插入链接"""
-        escaped_text = link_text.replace("'", "\\'").replace('"', '\\"')
-        link_html = f'<span style="background-color: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; padding: 3px 8px; margin: 0 3px; color: #1976d2; font-weight: 500;" data-card-id="{card_id}">🔗 {escaped_text}</span>'
-
-        try:
-            # 直接使用JavaScript插入HTML，避免loadNote()覆盖问题
-            escaped_html = link_html.replace("'", "\\'").replace('"', '\\"')
-
-            # 在光标位置插入链接
-            js_code = f"""
-            try {{
-                var selection = window.getSelection();
-                var range = selection.getRangeAt(0);
-                var linkElement = document.createElement('span');
-                linkElement.innerHTML = '{escaped_html}';
-                range.insertNode(linkElement.firstChild);
-
-                // 移动光标到链接后面
-                range.setStartAfter(linkElement.firstChild);
-                range.setEndAfter(linkElement.firstChild);
-                selection.removeAllRanges();
-                selection.addRange(range);
-
-                // 触发输入事件以更新编辑器
-                document.execCommand('insertText', false, ' ');
-                document.execCommand('undo');
-            }} catch(e) {{
-                // 备用方法：直接插入HTML
-                document.execCommand('insertHTML', false, '{escaped_html} ');
-            }}
-            """
-
-            editor.web.eval(js_code)
-
-        except Exception as e:
-            # 最后的备用方法：使用纯文本
-            link_mark = f"[🔗{link_text}] "
-            try:
-                editor.web.eval(f"document.execCommand('insertText', false, '{link_mark}');")
-            except:
-                # 如果所有方法都失败，至少在字段开头添加链接
-                current_field = editor.currentField
-                if current_field is not None:
-                    current_content = editor.note.fields[current_field]
-                    if current_content.strip():
-                        new_content = link_mark + current_content
-                    else:
-                        new_content = link_mark
-                    editor.note.fields[current_field] = new_content
-                    editor.loadNote()
+        """在编辑器中插入链接 - 仅存储JSON数据，不显示可视链接"""
+        # 不再在编辑器中插入可视链接，只保存JSON数据
+        # 链接信息已经通过 add_link_to_note 方法保存到 LinkedCards 字段
+        pass
     
     def add_link_to_note(self, note, card_id, link_text):
         """Add link to note"""
@@ -474,17 +428,14 @@ class LinkDialog(QDialog):
         # 调试信息
         print(f"创建链接: 卡片ID={self.selected_card_id}, 链接文本={link_text}")
 
-        # Save link information first
+        # Save link information to LinkedCards field
         success = self.card_linker.add_link_to_note(self.current_note, self.selected_card_id, link_text)
 
         if not success:
             showInfo("链接创建失败，请检查卡片是否存在")
             return
 
-        # Insert link to editor
-        self.card_linker.insert_link(self.editor, link_text, self.selected_card_id)
-
-        # Force refresh the editor to show updated LinkedCards field
+        # Refresh the editor to show updated LinkedCards field
         try:
             self.editor.loadNote()
         except:
