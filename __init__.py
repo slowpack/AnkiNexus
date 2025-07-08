@@ -155,15 +155,9 @@ class CardLinker:
             # Create AnkiNexus template
             model = self.create_default_note_type()
             if model:
-                # Switch to the new template
-                try:
-                    mw.col.conf['curModel'] = model['id']
-                    mw.col.save()
-                    showInfo(get_text("template_created_switched"))
-                    return True
-                except Exception as e:
-                    showInfo(get_text("switch_failed_error").format(str(e)))
-                    return False
+                # 不自动切换，提示用户手动切换
+                showInfo(get_text("template_created_manual_switch").format(model['name'], model['name']))
+                return False
             return False
         else:
             # User declined, show manual instructions
@@ -183,15 +177,32 @@ class CardLinker:
             for card_id in card_ids[:30]:
                 card = mw.col.getCard(card_id)
                 note = card.note()
+
+                # 清理标题用于显示
+                raw_question = note.fields[0] if note.fields else ""
+                clean_question = self.clean_card_title_for_search(raw_question)
+
                 cards.append({
                     'id': card_id,
                     'note_id': note.id,
-                    'question': note.fields[0][:80],
+                    'question': clean_question[:80],  # 限制长度
                     'deck': mw.col.decks.name(card.did)
                 })
             return cards
         except:
             return []
+
+    def clean_card_title_for_search(self, title):
+        """为搜索结果清理卡片标题"""
+        import re
+
+        # 去除HTML标签
+        clean_title = re.sub(r'<[^>]+>', '', title)
+
+        # 去除多余的空白字符和换行
+        clean_title = re.sub(r'\s+', ' ', clean_title).strip()
+
+        return clean_title
     
     def create_new_card(self, current_note, front, back):
         """Create new card"""
@@ -285,174 +296,486 @@ class LinkDialog(QDialog):
         self.editor = editor
         self.card_linker = card_linker
         self.current_note = editor.note
-        self.selected_card_id = None
-        self.selected_card_title = None
+        self.selected_cards = []  # 改为列表存储多个选中的卡片
         self.setup_ui()
     
     def setup_ui(self):
         """Setup UI"""
         self.setWindowTitle(get_text("dialog_title"))
-        self.setMinimumSize(500, 400)
+        self.setMinimumSize(800, 400)
 
         layout = QVBoxLayout()
 
-        # Link text
-        layout.addWidget(QLabel(get_text("link_text_label")))
-        self.link_text_input = QLineEdit()
-        self.link_text_input.setPlaceholderText(get_text("link_text_placeholder"))
-        layout.addWidget(self.link_text_input)
+        # 上半部分：搜索和已选择卡片并排显示
+        top_layout = QHBoxLayout()
 
-        # Search existing cards
-        layout.addWidget(QLabel(get_text("search_existing_label")))
+        # 左侧：搜索区域
+        search_group = QGroupBox("🔍 搜索卡片")
+        search_layout = QVBoxLayout()
+
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText(get_text("search_placeholder"))
         self.search_input.textChanged.connect(self.search_cards)
-        layout.addWidget(self.search_input)
+        search_layout.addWidget(self.search_input)
 
+        # 搜索结果列表
         self.search_results = QListWidget()
-        self.search_results.setMaximumHeight(120)
-        self.search_results.itemClicked.connect(self.select_existing_card)
-        layout.addWidget(self.search_results)
+        self.search_results.setMaximumHeight(200)
+        self.search_results.itemDoubleClicked.connect(self.on_item_double_clicked)
+        search_layout.addWidget(self.search_results)
 
-        # Or create new card
-        layout.addWidget(QLabel(get_text("create_new_label")))
-        self.front_input = QLineEdit()
-        self.front_input.setPlaceholderText(get_text("front_placeholder"))
-        layout.addWidget(self.front_input)
+        # 添加选中卡片按钮
+        add_selected_btn = QPushButton("➕ 添加选中卡片")
+        add_selected_btn.clicked.connect(self.on_add_button_clicked)
+        add_selected_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 6px;")
+        search_layout.addWidget(add_selected_btn)
 
-        self.back_input = QLineEdit()
-        self.back_input.setPlaceholderText(get_text("back_placeholder"))
-        layout.addWidget(self.back_input)
+        search_group.setLayout(search_layout)
+        top_layout.addWidget(search_group)
 
-        create_btn = QPushButton(get_text("create_new_button"))
-        create_btn.clicked.connect(self.create_new_card)
-        layout.addWidget(create_btn)
+        # 右侧：已选择卡片区域
+        selected_group = QGroupBox("📋 已选择的卡片")
+        selected_layout = QVBoxLayout()
 
-        # Status display
-        self.status_label = QLabel(get_text("status_default"))
-        self.status_label.setStyleSheet("background-color: #f5f5f5; padding: 8px; border-radius: 4px;")
+        # 已选择卡片列表
+        self.selected_cards_list = QListWidget()
+        self.selected_cards_list.setMaximumHeight(200)
+        selected_layout.addWidget(self.selected_cards_list)
+
+        # 操作按钮行
+        selected_buttons_layout = QHBoxLayout()
+
+        remove_selected_btn = QPushButton("🗑️ 移除选中")
+        remove_selected_btn.clicked.connect(self.remove_selected_card)
+        remove_selected_btn.setStyleSheet("background-color: #f44336; color: white; padding: 4px;")
+
+        clear_all_btn = QPushButton("🧹 清空全部")
+        clear_all_btn.clicked.connect(self.clear_all_selections)
+        clear_all_btn.setStyleSheet("background-color: #ff9800; color: white; padding: 4px;")
+
+        selected_buttons_layout.addWidget(remove_selected_btn)
+        selected_buttons_layout.addWidget(clear_all_btn)
+        selected_buttons_layout.addStretch()
+
+        selected_layout.addLayout(selected_buttons_layout)
+        selected_group.setLayout(selected_layout)
+        top_layout.addWidget(selected_group)
+
+        layout.addLayout(top_layout)
+
+        # 创建新卡片区域
+        create_group = QGroupBox("➕ 创建新卡片")
+        create_layout = QHBoxLayout()
+
+        create_info_label = QLabel("点击按钮快速创建新卡片，创建成功后会自动添加为链接")
+        create_info_label.setStyleSheet("color: #666; font-size: 12px;")
+        create_layout.addWidget(create_info_label)
+
+        create_layout.addStretch()
+
+        create_btn = QPushButton("🆕 " + get_text("create_new_button"))
+        create_btn.clicked.connect(self.open_add_cards_dialog)
+        create_btn.setStyleSheet("background-color: #2196F3; color: white; padding: 8px; font-weight: bold;")
+        create_layout.addWidget(create_btn)
+
+        create_group.setLayout(create_layout)
+        layout.addWidget(create_group)
+
+        # 状态显示
+        self.status_label = QLabel("双击或点击添加按钮来选择卡片，选择后会立即创建链接")
+        self.status_label.setStyleSheet("background-color: #e3f2fd; padding: 8px; border-radius: 4px; color: #1976d2;")
         layout.addWidget(self.status_label)
 
-        # Buttons
+        # 只保留关闭按钮
         button_layout = QHBoxLayout()
-        add_btn = QPushButton("➕ " + get_text("create_link_button"))
-        add_btn.clicked.connect(self.create_link)
-        add_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 8px;")
+        button_layout.addStretch()
 
-        done_btn = QPushButton("✅ 完成")
-        done_btn.clicked.connect(self.accept)
-        done_btn.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold; padding: 8px;")
+        close_btn = QPushButton("✅ 关闭")
+        close_btn.clicked.connect(self.accept)
+        close_btn.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold; padding: 8px;")
+        button_layout.addWidget(close_btn)
 
-        cancel_btn = QPushButton(get_text("cancel_button"))
-        cancel_btn.clicked.connect(self.reject)
-
-        button_layout.addWidget(add_btn)
-        button_layout.addWidget(done_btn)
-        button_layout.addWidget(cancel_btn)
         layout.addLayout(button_layout)
 
         self.setLayout(layout)
-    
+
+        # 加载已有的链接
+        self.load_existing_links()
+
+    def load_existing_links(self):
+        """加载已有的链接到显示列表"""
+        try:
+            linked_cards = self.card_linker.get_linked_cards(self.current_note)
+
+            for link in linked_cards:
+                try:
+                    # 验证卡片是否还存在
+                    card = mw.col.getCard(link['card_id'])
+                    if card:
+                        selected_card = {
+                            'id': link['card_id'],
+                            'note_id': link['note_id'],
+                            'title': link['title'],
+                            'deck': link['deck'],
+                            'display_text': link['title'][:40] + "..." if len(link['title']) > 40 else link['title']
+                        }
+                        self.selected_cards.append(selected_card)
+                except:
+                    # 卡片不存在，跳过
+                    continue
+
+            self.update_selected_cards_display()
+            self.update_status()
+        except:
+            # 如果加载失败，继续正常流程
+            pass
+
     def search_cards(self):
         """搜索卡片"""
         query = self.search_input.text().strip()
         if not query:
             self.search_results.clear()
             return
-        
+
         self.search_results.clear()
         cards = self.card_linker.search_cards(query)
-        
+
         for card_info in cards:
             if card_info['note_id'] == self.current_note.id:
                 continue
 
+            # 检查是否已经选择过这张卡片
+            already_selected = any(selected['id'] == card_info['id'] for selected in self.selected_cards)
+
             item_text = f"{card_info['question']} ({get_text('deck_label')}: {card_info['deck']})"
+            if already_selected:
+                item_text = f"✅ {item_text}"
+
             item = QListWidgetItem(item_text)
             item.setData(USER_ROLE, card_info)
+
+            # 如果已选择，设置不同的背景色
+            if already_selected:
+                item.setBackground(QColor(200, 255, 200))
+
             self.search_results.addItem(item)
-    
-    def select_existing_card(self, item):
-        """选择现有卡片"""
+
+    def on_item_double_clicked(self, item):
+        """处理双击事件"""
+        self.add_card_to_selection(item)
+
+    def on_add_button_clicked(self):
+        """处理添加按钮点击事件"""
+        current_item = self.search_results.currentItem()
+        if not current_item:
+            showInfo("请先选择一张卡片")
+            return
+        self.add_card_to_selection(current_item)
+
+    def add_card_to_selection(self, item):
+        """添加卡片并立即创建链接"""
+        if not item:
+            return
+
         card_info = item.data(USER_ROLE)
-        self.selected_card_id = card_info['id']
-        self.selected_card_title = card_info['question'][:50]  # 保存卡片标题用作默认链接名称
+        if not card_info:
+            return
 
-        # 如果链接文本输入框为空，自动填充卡片标题
-        if not self.link_text_input.text().strip():
-            self.link_text_input.setText(self.selected_card_title)
+        # 检查是否已经链接过
+        if any(selected['id'] == card_info['id'] for selected in self.selected_cards):
+            showInfo("该卡片已经添加过了")
+            return
 
-        self.status_label.setText(f"已选择: {card_info['question'][:40]}...")
-        self.status_label.setStyleSheet("background-color: #e8f5e8; padding: 8px; border-radius: 4px;")
+        # 处理HTML格式和特殊字符，清理标题
+        raw_title = card_info['question']
+        clean_title = self.clean_card_title(raw_title)
+        link_text = clean_title[:50]
+
+        # 立即创建链接
+        success = self.card_linker.add_link_to_note(self.current_note, card_info['id'], link_text)
+
+        if success:
+            # 添加到已选择列表用于显示
+            selected_card = {
+                'id': card_info['id'],
+                'note_id': card_info['note_id'],
+                'title': link_text,
+                'deck': card_info['deck'],
+                'display_text': clean_title[:40] + "..." if len(clean_title) > 40 else clean_title
+            }
+
+            self.selected_cards.append(selected_card)
+            self.update_selected_cards_display()
+
+            # 刷新编辑器
+            try:
+                self.editor.loadNote()
+            except:
+                pass
+
+            # 更新状态
+            self.status_label.setText(f"✅ 已添加链接: {clean_title[:30]}...")
+            self.status_label.setStyleSheet("background-color: #e8f5e8; padding: 8px; border-radius: 4px; color: #2e7d32;")
+
+            # 刷新搜索结果显示
+            self.search_cards()
+        else:
+            showInfo("链接创建失败，请检查卡片是否存在")
+
+    def update_selected_cards_display(self):
+        """更新已选择卡片的显示"""
+        self.selected_cards_list.clear()
+
+        for i, card in enumerate(self.selected_cards):
+            item_text = f"{i+1}. {card['display_text']} ({card['deck']})"
+            item = QListWidgetItem(item_text)
+            item.setData(USER_ROLE, card)
+            self.selected_cards_list.addItem(item)
+
+    def update_status(self):
+        """更新状态显示"""
+        count = len(self.selected_cards)
+        if count == 0:
+            self.status_label.setText("双击或点击添加按钮来选择卡片，选择后会立即创建链接")
+            self.status_label.setStyleSheet("background-color: #e3f2fd; padding: 8px; border-radius: 4px; color: #1976d2;")
+        else:
+            self.status_label.setText(f"已创建 {count} 个链接")
+            self.status_label.setStyleSheet("background-color: #e8f5e8; padding: 8px; border-radius: 4px; color: #2e7d32;")
+
+    def remove_selected_card(self):
+        """移除选中的卡片并删除链接"""
+        current_item = self.selected_cards_list.currentItem()
+        if not current_item:
+            showInfo("请先选择要移除的卡片")
+            return
+
+        card_info = current_item.data(USER_ROLE)
+        if card_info:
+            # 从LinkedCards字段中移除链接
+            linked_cards = self.card_linker.get_linked_cards(self.current_note)
+            linked_cards = [link for link in linked_cards if link['card_id'] != card_info['id']]
+
+            # 保存更新后的链接数据
+            success = self.card_linker.save_linked_cards(self.current_note, linked_cards)
+
+            if success:
+                # 从显示列表中移除
+                self.selected_cards = [card for card in self.selected_cards if card['id'] != card_info['id']]
+                self.update_selected_cards_display()
+                self.update_status()
+
+                # 刷新编辑器
+                try:
+                    self.editor.loadNote()
+                except:
+                    pass
+
+                # 刷新搜索结果显示
+                self.search_cards()
+
+                self.status_label.setText(f"✅ 已移除链接: {card_info['display_text']}")
+                self.status_label.setStyleSheet("background-color: #fff3cd; padding: 8px; border-radius: 4px; color: #856404;")
+            else:
+                showInfo("移除链接失败")
+
+    def clear_all_selections(self):
+        """清空所有链接"""
+        if not self.selected_cards:
+            return
+
+        from aqt.utils import askUser
+        if askUser("确定要删除所有已创建的链接吗？"):
+            # 清空LinkedCards字段
+            success = self.card_linker.save_linked_cards(self.current_note, [])
+
+            if success:
+                self.selected_cards.clear()
+                self.update_selected_cards_display()
+                self.update_status()
+
+                # 刷新编辑器
+                try:
+                    self.editor.loadNote()
+                except:
+                    pass
+
+                # 刷新搜索结果显示
+                self.search_cards()
+
+                self.status_label.setText("✅ 已清空所有链接")
+                self.status_label.setStyleSheet("background-color: #fff3cd; padding: 8px; border-radius: 4px; color: #856404;")
+            else:
+                showInfo("清空链接失败")
+
+    def clean_card_title(self, title):
+        """清理卡片标题，去除HTML标签和特殊字符"""
+        import re
+
+        # 去除HTML标签
+        clean_title = re.sub(r'<[^>]+>', '', title)
+
+        # 去除多余的空白字符和换行
+        clean_title = re.sub(r'\s+', ' ', clean_title).strip()
+
+        # 去除特殊字符，保留基本的文字、数字、标点
+        clean_title = re.sub(r'[^\w\s\u4e00-\u9fff.,!?;:()\-\[\]{}"]', '', clean_title)
+
+        return clean_title
     
-    def create_new_card(self):
-        """Create new card"""
+    def open_add_cards_dialog(self):
+        """打开简单的添加卡片对话框"""
+        self.create_simple_add_card_dialog()
+
+    def create_simple_add_card_dialog(self):
+        """创建简单的添加卡片对话框（备选方案）"""
+        dialog = SimpleAddCardDialog(self)
+        if dialog.exec() == DIALOG_ACCEPTED:
+            # 获取创建的卡片信息
+            if hasattr(dialog, 'created_card_id') and dialog.created_card_id:
+                self.auto_add_created_card(dialog.created_card_id, dialog.created_card_title)
+
+    def auto_add_created_card(self, card_id, card_title):
+        """自动添加刚创建的卡片为链接"""
+        try:
+            # 清理标题
+            clean_title = self.clean_card_title(card_title)
+            link_text = clean_title[:50]
+
+            # 立即创建链接
+            success = self.card_linker.add_link_to_note(self.current_note, card_id, link_text)
+
+            if success:
+                # 获取卡片信息
+                card = mw.col.getCard(card_id)
+                deck_name = mw.col.decks.name(card.did)
+
+                # 添加到已选择列表用于显示
+                selected_card = {
+                    'id': card_id,
+                    'note_id': card.note().id,
+                    'title': link_text,
+                    'deck': deck_name,
+                    'display_text': clean_title[:40] + "..." if len(clean_title) > 40 else clean_title
+                }
+
+                self.selected_cards.append(selected_card)
+                self.update_selected_cards_display()
+
+                # 刷新编辑器
+                try:
+                    self.editor.loadNote()
+                except:
+                    pass
+
+                # 更新状态
+                self.status_label.setText(f"✅ 新卡片已创建并添加链接: {clean_title[:30]}...")
+                self.status_label.setStyleSheet("background-color: #e8f5e8; padding: 8px; border-radius: 4px; color: #2e7d32;")
+            else:
+                showInfo("新卡片创建成功，但链接创建失败")
+        except Exception as e:
+            showInfo(f"添加链接失败: {str(e)}")
+
+
+class SimpleAddCardDialog(QDialog):
+    """简单的添加卡片对话框"""
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent_dialog = parent
+        self.created_card_id = None
+        self.created_card_title = None
+        self.setup_ui()
+
+    def setup_ui(self):
+        """设置UI"""
+        self.setWindowTitle("创建新卡片")
+        self.setMinimumSize(400, 200)
+
+        layout = QVBoxLayout()
+
+        # 正面内容
+        layout.addWidget(QLabel("正面内容:"))
+        self.front_input = QLineEdit()
+        self.front_input.setPlaceholderText("输入卡片正面内容...")
+        layout.addWidget(self.front_input)
+
+        # 背面内容
+        layout.addWidget(QLabel("背面内容:"))
+        self.back_input = QLineEdit()
+        self.back_input.setPlaceholderText("输入卡片背面内容...")
+        layout.addWidget(self.back_input)
+
+        # 按钮
+        button_layout = QHBoxLayout()
+
+        create_btn = QPushButton("创建卡片")
+        create_btn.clicked.connect(self.create_card)
+        create_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px; font-weight: bold;")
+
+        cancel_btn = QPushButton("取消")
+        cancel_btn.clicked.connect(self.reject)
+
+        button_layout.addWidget(create_btn)
+        button_layout.addWidget(cancel_btn)
+
+        layout.addLayout(button_layout)
+        self.setLayout(layout)
+
+        # 设置焦点
+        self.front_input.setFocus()
+
+    def create_card(self):
+        """创建卡片"""
         front = self.front_input.text().strip()
         back = self.back_input.text().strip()
 
         if not front or not back:
-            showInfo(get_text("enter_front_back"))
+            showInfo("请填写正面和背面内容")
             return
 
-        card_id = self.card_linker.create_new_card(self.current_note, front, back)
-        if card_id:
-            self.selected_card_id = card_id
-            self.selected_card_title = front[:50]  # 保存新创建卡片的标题
-
-            # 如果链接文本输入框为空，自动填充新卡片的标题
-            if not self.link_text_input.text().strip():
-                self.link_text_input.setText(self.selected_card_title)
-
-            self.status_label.setText(f"Created: {front[:40]}...")
-            self.status_label.setStyleSheet("background-color: #e3f2fd; padding: 8px; border-radius: 4px;")
-            self.front_input.clear()
-            self.back_input.clear()
-    
-    def create_link(self):
-        """Create link"""
-        link_text = self.link_text_input.text().strip()
-
-        # 如果没有输入链接文本，但有选中的卡片，使用卡片标题作为默认名称
-        if not link_text and self.selected_card_title:
-            link_text = self.selected_card_title
-            self.link_text_input.setText(link_text)  # 更新输入框显示
-
-        if not link_text:
-            showInfo(get_text("enter_link_text"))
-            return
-
-        if not self.selected_card_id:
-            showInfo(get_text("select_or_create"))
-            return
-
-        # 调试信息
-        print(f"创建链接: 卡片ID={self.selected_card_id}, 链接文本={link_text}")
-
-        # Save link information to LinkedCards field
-        success = self.card_linker.add_link_to_note(self.current_note, self.selected_card_id, link_text)
-
-        if not success:
-            showInfo("链接创建失败，请检查卡片是否存在")
-            return
-
-        # Refresh the editor to show updated LinkedCards field
         try:
-            self.editor.loadNote()
-        except:
-            pass
+            # 使用当前笔记的模板创建新卡片
+            current_note = self.parent_dialog.current_note
+            model = current_note.model()
 
-        # 显示成功消息但不关闭对话框
-        self.status_label.setText(f"✅ 链接已创建: {link_text}")
-        self.status_label.setStyleSheet("background-color: #e8f5e8; padding: 8px; border-radius: 4px; color: #2e7d32;")
+            # 创建新笔记
+            new_note = Note(mw.col, model)
 
-        # 清空输入框，准备添加下一个链接
-        self.link_text_input.clear()
-        self.selected_card_id = None
-        self.selected_card_title = None
+            # 设置字段内容
+            if len(new_note.fields) > 0:
+                new_note.fields[0] = front
+            if len(new_note.fields) > 1:
+                new_note.fields[1] = back
 
-        # 清空搜索结果
-        self.search_results.clear()
-        self.search_input.clear()
+            # 设置牌组（使用当前卡片的牌组或默认牌组）
+            try:
+                if mw.reviewer and mw.reviewer.card:
+                    deck_id = mw.reviewer.card.did
+                else:
+                    deck_id = mw.col.conf['curDeck']
+                new_note.model()['did'] = deck_id
+            except:
+                # 使用默认牌组
+                pass
+
+            # 添加笔记到集合
+            mw.col.addNote(new_note)
+            mw.col.save()
+
+            # 获取创建的卡片
+            new_cards = new_note.cards()
+            if new_cards:
+                self.created_card_id = new_cards[0].id
+                self.created_card_title = front
+
+                showInfo(f"卡片创建成功: {front[:30]}...")
+                self.accept()
+            else:
+                showInfo("卡片创建失败：未生成卡片")
+
+        except Exception as e:
+            showInfo(f"创建卡片失败: {str(e)}")
+            print(f"Create card error: {e}")
+
 
 # 创建插件实例
 card_linker = CardLinker()

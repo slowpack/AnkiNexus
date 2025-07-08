@@ -67,6 +67,7 @@ LANGUAGES = {
         "create_template_suggestion": "To use the Card Linker feature, you need a note type with '{}' field.\n\nWould you like me to create an 'AnkiNexus - Knowledge Linker' note type for you?\n\nThis will include:\n• Front and Back fields\n• LinkedCards field for storing links\n• Optimized templates for compound cards",
         "template_switched": "Successfully switched to AnkiNexus note type! You can now create linked cards.",
         "template_created_switched": "Successfully created and switched to AnkiNexus note type! You can now create linked cards.",
+        "template_created_manual_switch": "Successfully created '{}' note type!\n\nPlease manually switch to this note type:\n\n1. Click the note type dropdown in the editor\n2. Select '{}'\n3. Then try creating links again",
         "switch_failed_error": "Failed to switch note type: {}",
         "manual_switch_instructions": "Please manually switch to '{}' note type:\n\n1. Click the note type dropdown in the editor\n2. Select '{}'\n3. Then try creating links again",
 
@@ -142,6 +143,7 @@ LANGUAGES = {
         "create_template_suggestion": "要使用卡片链接功能，需要包含 '{}' 字段的笔记类型。\n\n是否让我为您创建一个 'AnkiNexus - 知识链接器' 笔记类型？\n\n它将包含：\n• 正面和背面字段\n• LinkedCards 字段用于存储链接\n• 为复合卡片优化的模板",
         "template_switched": "成功切换到 AnkiNexus 笔记类型！现在可以创建链接卡片了。",
         "template_created_switched": "成功创建并切换到 AnkiNexus 笔记类型！现在可以创建链接卡片了。",
+        "template_created_manual_switch": "成功创建 '{}' 笔记类型！\n\n请手动切换到此笔记类型：\n\n1. 点击编辑器中的笔记类型下拉菜单\n2. 选择 '{}'\n3. 然后重新尝试创建链接",
         "switch_failed_error": "切换笔记类型失败: {}",
         "manual_switch_instructions": "请手动切换到 '{}' 笔记类型：\n\n1. 点击编辑器中的笔记类型下拉菜单\n2. 选择 '{}'\n3. 然后重新尝试创建链接",
 
