@@ -890,6 +890,7 @@ def add_linked_cards_to_review(html, card, context):
             
             links_html += '</div>'  # 关闭 linked-cards-wrapper
             links_html += f'<div class="linked-cards-tip">{get_text("review_status_tip")}</div>'
+            links_html += f'<div class="linked-cards-tip">{get_text("deck_switch_notice")}</div>'
             links_html += '</div>'  # 关闭 linked-cards-container
             html = css + html + links_html
     
@@ -926,6 +927,31 @@ def check_card_reviewed_today(card):
     except Exception as e:
         return False
 
+def is_card_in_current_deck(card):
+    """Check if card is in the current review deck"""
+    try:
+        if not mw.reviewer or not mw.reviewer.card:
+            return False
+
+        current_deck_id = mw.reviewer.card.did
+        target_deck_id = card.did
+
+        # Check if it's the same deck
+        if current_deck_id == target_deck_id:
+            return True
+
+        # Check if target deck is a subdeck of current deck
+        current_deck_name = mw.col.decks.name(current_deck_id)
+        target_deck_name = mw.col.decks.name(target_deck_id)
+
+        # If target deck name starts with current deck name + "::", it's a subdeck
+        if target_deck_name.startswith(current_deck_name + "::"):
+            return True
+
+        return False
+    except Exception as e:
+        return False
+
 # Handle click commands
 def handle_linked_card_click(cmd):
     """Handle linked card click"""
@@ -939,11 +965,20 @@ def handle_linked_card_click(cmd):
             card_id = int(parts[1])
             is_reviewed = parts[2] == "true"
 
-            if is_reviewed:
-                # Reviewed card: show preview
+            # Get the target card
+            target_card = mw.col.getCard(card_id)
+            if not target_card:
+                showInfo(get_text("card_not_found"))
+                return
+
+            # Check if card is in current review deck
+            in_current_deck = is_card_in_current_deck(target_card)
+
+            if is_reviewed or not in_current_deck:
+                # Reviewed card or card not in current deck: show preview
                 show_card_preview(card_id)
             else:
-                # Unreviewed card: execute smart switch
+                # Unreviewed card in current deck: execute smart switch
                 open_card_in_browser(card_id)
 
     except Exception as e:
@@ -1045,26 +1080,14 @@ def handle_suspended_card(card):
                 return True
             else:
                 return False
-        elif card.queue == -2:  # Buried card
-            message = get_text("unbury_card_question")
-            if askUser(message):
-                # Unbury the card
-                mw.col.sched.unburyCards()
-                mw.col.save()
-                showInfo(get_text("card_unburied"))
-                return True
-            else:
-                return False
-        elif card.queue == -3:  # Buried (sibling)
-            message = get_text("unbury_card_question")
-            if askUser(message):
-                # Unbury the card
-                mw.col.sched.unburyCards()
-                mw.col.save()
-                showInfo(get_text("card_unburied"))
-                return True
-            else:
-                return False
+        elif card.queue in (-2, -3):  # Buried cards (user or sibling)  
+            message = get_text("unbury_card_question")  
+            if askUser(message):  
+                # 使用现代API，传递具体卡片ID  
+                mw.col.sched.unbury_cards([card.id])  
+                mw.col.save()  
+                showInfo(get_text("card_unburied"))  
+                return True  
         else:
             # Other negative queue values - ask generically
             message = get_text("restore_card_question")

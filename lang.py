@@ -38,6 +38,7 @@ LANGUAGES = {
         # Review interface
         "related_knowledge": "🧠 Related Knowledge Points",
         "review_status_tip": "💡 Green ✅ means reviewed today, Orange ⏳ means pending review",
+        "deck_switch_notice": "📋 Note: Due to Anki's review mechanism, linked cards not in the current review deck cannot be directly reviewed. They will open in preview mode instead.",
         
         # Card status
         "card_not_found": "Card not found",
@@ -166,6 +167,7 @@ LANGUAGES = {
         # Review interface
         "related_knowledge": "🧠 相关知识点",
         "review_status_tip": "💡 绿色✅表示今日已复习，橙色⏳表示待复习",
+        "deck_switch_notice": "📋 提示：由于Anki复习机制，链接卡片不属于当前复习牌组时无法直接跳转复习，已更换为预览模式。",
         
         # Card status
         "card_not_found": "找不到指定的卡片",
